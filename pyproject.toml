@@ -1,0 +1,78 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "transparency-engine"
+version = "0.3.0"
+description = "Open-Source Transparency Reporting for Digital Platforms"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "Remi Ounadjela", email = "remi@ounadjela.com"},
+]
+keywords = [
+    "transparency",
+    "reporting",
+    "dsa",
+    "osa",
+    "trust-and-safety",
+    "digital-services-act",
+    "online-safety-act",
+    "content-moderation",
+    "regulatory-compliance",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "click>=8.1",
+    "jinja2>=3.1",
+    "pandas>=2.0",
+    "pydantic>=2.0",
+    "matplotlib>=3.7",
+    "pyarrow>=12.0",
+]
+
+[project.optional-dependencies]
+pdf = ["weasyprint>=60.0"]
+sql = ["sqlalchemy>=2.0"]
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "ruff>=0.1",
+]
+all = ["transparency-engine[pdf,sql,dev]"]
+
+[project.scripts]
+transparency-engine = "transparency_engine.cli:cli"
+
+[project.urls]
+Homepage = "https://github.com/RemiOunadjela/transparency-engine"
+Repository = "https://github.com/RemiOunadjela/transparency-engine"
+Issues = "https://github.com/RemiOunadjela/transparency-engine/issues"
+
+[tool.setuptools.packages.find]
+include = ["transparency_engine*"]
+
+[tool.setuptools.package-data]
+"transparency_engine.reports" = ["templates/*.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
