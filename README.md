@@ -224,6 +224,12 @@ pip install -e ".[dev]"
 pytest
 ```
 
+## Related Projects
+
+- **[safetybench](https://github.com/RemiOunadjela/safetybench)** -- Benchmarking framework for evaluating content moderation models against T&S-specific metrics.
+- **[crisis-lens](https://github.com/RemiOunadjela/crisis-lens)** -- Real-time crisis detection and triage for Trust & Safety text streams.
+- **[metric-guard](https://github.com/RemiOunadjela/metric-guard)** -- Data quality monitoring for compliance and regulatory metrics pipelines.
+
 ## License
 
-MIT -- see [LICENSE](LICENSE).
+MIT
