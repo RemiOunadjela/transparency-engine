@@ -53,6 +53,10 @@ class PeriodSpec(BaseModel):
     def __str__(self) -> str:
         return f"{self.year}-{self.label}"
 
+    def yoy_period(self) -> "PeriodSpec":
+        """Return the same label period from the prior year (year-over-year baseline)."""
+        return PeriodSpec(year=self.year - 1, label=self.label)
+
 
 class ProjectConfig(BaseModel):
     """Project-level configuration stored in transparency-engine.json."""

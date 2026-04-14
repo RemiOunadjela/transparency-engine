@@ -171,6 +171,17 @@ def validate(framework: str | None, period: str, data_path: str, config_path: st
 @click.option("--output", "output_path", default=None, help="Output file path.")
 @click.option("--platform-name", default=None, help="Report header name.")
 @click.option(
+    "--compare-period",
+    default=None,
+    help="Period to compare against (e.g. 2023-H1). Adds a comparison table to the report.",
+)
+@click.option(
+    "--yoy",
+    is_flag=True,
+    default=False,
+    help="Include year-over-year comparison using the same label from the prior year.",
+)
+@click.option(
     "--config",
     "config_path",
     default=None,
@@ -184,9 +195,15 @@ def generate(
     output_format: str,
     output_path: str | None,
     platform_name: str | None,
+    compare_period: str | None,
+    yoy: bool,
     config_path: str | None,
 ) -> None:
-    """Generate a transparency report."""
+    """Generate a transparency report.
+
+    Use --yoy to automatically include a year-over-year comparison (same label,
+    prior year). Use --compare-period to specify an explicit baseline period.
+    """
     from transparency_engine.frameworks import get_framework
     from transparency_engine.ingestion import load_data
     from transparency_engine.reports import ReportGenerator
@@ -196,8 +213,44 @@ def generate(
     period_spec = PeriodSpec.parse(period)
     fmt = OutputFormat(output_format.lower())
 
+    if yoy and compare_period:
+        click.echo("Error: --yoy and --compare-period are mutually exclusive.")
+        sys.exit(1)
+
     df = load_data(data_path)
     pname = platform_name or config.platform_name
+
+    # Resolve the comparison period
+    prev_period_spec: PeriodSpec | None = None
+    if yoy:
+        prev_period_spec = period_spec.yoy_period()
+        click.echo(f"Year-over-year comparison: {period_spec} vs {prev_period_spec}")
+    elif compare_period:
+        prev_period_spec = PeriodSpec.parse(compare_period)
+        click.echo(f"Period comparison: {period_spec} vs {prev_period_spec}")
+
+    # Filter current and previous period data separately so the report
+    # sections only aggregate the requested period's rows.
+    if "period" in df.columns:
+        current_df = df[df["period"] == str(period_spec)].copy()
+    else:
+        current_df = df
+
+    prev_df = None
+    if prev_period_spec is not None:
+        if "period" in df.columns:
+            prev_df = df[df["period"] == str(prev_period_spec)].copy()
+            if prev_df.empty:
+                click.echo(
+                    f"Warning: no data found for comparison period {prev_period_spec}. "
+                    "Comparison table will be omitted."
+                )
+                prev_df = None
+        else:
+            click.echo(
+                "Warning: data has no 'period' column; cannot filter comparison period. "
+                "Comparison table will be omitted."
+            )
 
     if output_path is None:
         ext = {"markdown": "md", "html": "html", "pdf": "pdf", "json": "json"}[fmt.value]
@@ -206,8 +259,9 @@ def generate(
     generator = ReportGenerator(
         framework=fw,
         period=period_spec,
-        data=df,
+        data=current_df,
         platform_name=pname,
+        previous_period_data=prev_df,
     )
 
     click.echo(f"Generating {fmt.value.upper()} report for {fw.name} -- {period_spec}...")

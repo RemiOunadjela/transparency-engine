@@ -2,7 +2,9 @@
 
 import pandas as pd
 import pytest
+from click.testing import CliRunner
 
+from transparency_engine.cli import cli
 from transparency_engine.config import OutputFormat, PeriodSpec
 from transparency_engine.reports.generator import ReportGenerator
 
@@ -90,3 +92,142 @@ class TestReportGenerator:
     def test_pdf_requires_output_path(self, generator):
         with pytest.raises(ValueError, match="output_path is required"):
             generator.generate(OutputFormat.PDF)
+
+
+class TestPeriodSpecYoY:
+    def test_yoy_period_half_year(self):
+        period = PeriodSpec.parse("2024-H1")
+        yoy = period.yoy_period()
+        assert yoy.year == 2023
+        assert yoy.label == "H1"
+        assert str(yoy) == "2023-H1"
+
+    def test_yoy_period_quarterly(self):
+        period = PeriodSpec.parse("2025-Q3")
+        yoy = period.yoy_period()
+        assert str(yoy) == "2024-Q3"
+
+    def test_yoy_period_full_year(self):
+        period = PeriodSpec.parse("2024-FY")
+        yoy = period.yoy_period()
+        assert str(yoy) == "2023-FY"
+
+    def test_yoy_period_does_not_mutate_original(self):
+        period = PeriodSpec.parse("2024-H2")
+        _ = period.yoy_period()
+        assert str(period) == "2024-H2"
+
+
+class TestGenerateCLIComparison:
+    """Tests for --yoy and --compare-period flags in the generate command."""
+
+    @pytest.fixture
+    def multi_period_csv(self, tmp_path):
+        """CSV with data for both 2024-H1 and 2023-H1."""
+        rows = [
+            "metric_id,period,value",
+            "notices_received,2024-H1,284750",
+            "notices_actioned,2024-H1,213562",
+            "complaints_received,2024-H1,47830",
+            "complaints_reversed,2024-H1,6214",
+            "content_moderation_orders_received,2024-H1,342",
+            "notices_median_response_time,2024-H1,4.2",
+            "notices_received,2023-H1,241000",
+            "notices_actioned,2023-H1,180750",
+            "complaints_received,2023-H1,39200",
+            "complaints_reversed,2023-H1,5100",
+        ]
+        path = tmp_path / "metrics.csv"
+        path.write_text("\n".join(rows))
+        return str(path)
+
+    def test_generate_with_yoy_flag(self, multi_period_csv, tmp_path):
+        runner = CliRunner()
+        out_path = str(tmp_path / "report.md")
+        result = runner.invoke(
+            cli,
+            [
+                "generate",
+                "--framework", "dsa",
+                "--period", "2024-H1",
+                "--data", multi_period_csv,
+                "--format", "markdown",
+                "--output", out_path,
+                "--yoy",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        assert "2024-H1 vs 2023-H1" in result.output
+        content = open(out_path).read()
+        assert "Period Comparison" in content
+
+    def test_generate_with_compare_period(self, multi_period_csv, tmp_path):
+        runner = CliRunner()
+        out_path = str(tmp_path / "report.md")
+        result = runner.invoke(
+            cli,
+            [
+                "generate",
+                "--framework", "dsa",
+                "--period", "2024-H1",
+                "--data", multi_period_csv,
+                "--format", "markdown",
+                "--output", out_path,
+                "--compare-period", "2023-H1",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        assert "2024-H1 vs 2023-H1" in result.output
+        content = open(out_path).read()
+        assert "Period Comparison" in content
+
+    def test_yoy_and_compare_period_are_mutually_exclusive(self, multi_period_csv, tmp_path):
+        runner = CliRunner()
+        out_path = str(tmp_path / "report.md")
+        result = runner.invoke(
+            cli,
+            [
+                "generate",
+                "--framework", "dsa",
+                "--period", "2024-H1",
+                "--data", multi_period_csv,
+                "--format", "markdown",
+                "--output", out_path,
+                "--yoy",
+                "--compare-period", "2023-H1",
+            ],
+        )
+        assert result.exit_code != 0
+
+    def test_generate_yoy_missing_prior_data_warns(self, tmp_path):
+        """When prior-year data is absent, comparison is omitted with a warning."""
+        rows = [
+            "metric_id,period,value",
+            "notices_received,2024-H1,284750",
+            "notices_actioned,2024-H1,213562",
+            "complaints_received,2024-H1,47830",
+            "complaints_reversed,2024-H1,6214",
+            "content_moderation_orders_received,2024-H1,342",
+            "notices_median_response_time,2024-H1,4.2",
+        ]
+        csv_path = tmp_path / "current_only.csv"
+        csv_path.write_text("\n".join(rows))
+        out_path = str(tmp_path / "report.md")
+
+        runner = CliRunner()
+        result = runner.invoke(
+            cli,
+            [
+                "generate",
+                "--framework", "dsa",
+                "--period", "2024-H1",
+                "--data", str(csv_path),
+                "--format", "markdown",
+                "--output", out_path,
+                "--yoy",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        assert "Warning" in result.output
+        content = open(out_path).read()
+        assert "Period Comparison" not in content
