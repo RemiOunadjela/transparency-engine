@@ -164,7 +164,7 @@ def validate(framework: str | None, period: str, data_path: str, config_path: st
 @click.option(
     "--format",
     "output_format",
-    type=click.Choice(["markdown", "html", "pdf", "json"], case_sensitive=False),
+    type=click.Choice(["markdown", "html", "pdf", "json", "csv"], case_sensitive=False),
     default="html",
     help="Output format.",
 )
@@ -182,6 +182,13 @@ def validate(framework: str | None, period: str, data_path: str, config_path: st
     help="Include year-over-year comparison using the same label from the prior year.",
 )
 @click.option(
+    "--quiet",
+    "-q",
+    is_flag=True,
+    default=False,
+    help="Suppress informational output. Warnings are still printed.",
+)
+@click.option(
     "--config",
     "config_path",
     default=None,
@@ -197,6 +204,7 @@ def generate(
     platform_name: str | None,
     compare_period: str | None,
     yoy: bool,
+    quiet: bool,
     config_path: str | None,
 ) -> None:
     """Generate a transparency report.
@@ -224,10 +232,12 @@ def generate(
     prev_period_spec: PeriodSpec | None = None
     if yoy:
         prev_period_spec = period_spec.yoy_period()
-        click.echo(f"Year-over-year comparison: {period_spec} vs {prev_period_spec}")
+        if not quiet:
+            click.echo(f"Year-over-year comparison: {period_spec} vs {prev_period_spec}")
     elif compare_period:
         prev_period_spec = PeriodSpec.parse(compare_period)
-        click.echo(f"Period comparison: {period_spec} vs {prev_period_spec}")
+        if not quiet:
+            click.echo(f"Period comparison: {period_spec} vs {prev_period_spec}")
 
     # Filter current and previous period data separately so the report
     # sections only aggregate the requested period's rows.
@@ -253,7 +263,7 @@ def generate(
             )
 
     if output_path is None:
-        ext = {"markdown": "md", "html": "html", "pdf": "pdf", "json": "json"}[fmt.value]
+        ext = {"markdown": "md", "html": "html", "pdf": "pdf", "json": "json", "csv": "csv"}[fmt.value]
         output_path = f"reports/{fw.short_code}_report_{period_spec}.{ext}"
 
     generator = ReportGenerator(
@@ -264,12 +274,13 @@ def generate(
         previous_period_data=prev_df,
     )
 
-    click.echo(f"Generating {fmt.value.upper()} report for {fw.name} -- {period_spec}...")
+    if not quiet:
+        click.echo(f"Generating {fmt.value.upper()} report for {fw.name} -- {period_spec}...")
     result = generator.generate(fmt, output_path=output_path)
 
     if fmt == OutputFormat.PDF:
         click.echo(result)
-    else:
+    elif not quiet:
         click.echo(f"Report written to {output_path}")
 
 

@@ -255,3 +255,143 @@ class TestGenerateCLIComparison:
         assert "Warning" in result.output
         content = open(out_path).read()
         assert "Period Comparison" not in content
+
+
+class TestGenerateCLIQuiet:
+    """Tests for --quiet / -q flag on the generate command."""
+
+    @pytest.fixture
+    def simple_csv(self, tmp_path):
+        rows = [
+            "metric_id,period,value",
+            "notices_received,2024-H1,284750",
+            "notices_actioned,2024-H1,213562",
+            "complaints_received,2024-H1,47830",
+            "complaints_reversed,2024-H1,6214",
+            "content_moderation_orders_received,2024-H1,342",
+            "notices_median_response_time,2024-H1,4.2",
+        ]
+        path = tmp_path / "metrics.csv"
+        path.write_text("\n".join(rows))
+        return str(path)
+
+    @pytest.fixture
+    def multi_period_csv(self, tmp_path):
+        rows = [
+            "metric_id,period,value",
+            "notices_received,2024-H1,284750",
+            "notices_actioned,2024-H1,213562",
+            "complaints_received,2024-H1,47830",
+            "notices_received,2023-H1,241000",
+            "notices_actioned,2023-H1,180750",
+        ]
+        path = tmp_path / "metrics_multi.csv"
+        path.write_text("\n".join(rows))
+        return str(path)
+
+    def test_quiet_suppresses_progress_messages(self, simple_csv, tmp_path):
+        runner = CliRunner()
+        out_path = str(tmp_path / "report.md")
+        result = runner.invoke(
+            cli,
+            [
+                "generate",
+                "--framework", "dsa",
+                "--period", "2024-H1",
+                "--data", simple_csv,
+                "--format", "markdown",
+                "--output", out_path,
+                "--quiet",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        assert result.output == ""
+
+    def test_short_flag_q_also_works(self, simple_csv, tmp_path):
+        runner = CliRunner()
+        out_path = str(tmp_path / "report.md")
+        result = runner.invoke(
+            cli,
+            [
+                "generate",
+                "--framework", "dsa",
+                "--period", "2024-H1",
+                "--data", simple_csv,
+                "--format", "markdown",
+                "--output", out_path,
+                "-q",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        assert result.output == ""
+
+    def test_quiet_still_shows_warnings(self, tmp_path):
+        """--quiet does not suppress missing-data warnings."""
+        rows = [
+            "metric_id,period,value",
+            "notices_received,2024-H1,284750",
+            "complaints_received,2024-H1,47830",
+        ]
+        csv_path = tmp_path / "current_only.csv"
+        csv_path.write_text("\n".join(rows))
+        out_path = str(tmp_path / "report.md")
+
+        runner = CliRunner()
+        result = runner.invoke(
+            cli,
+            [
+                "generate",
+                "--framework", "dsa",
+                "--period", "2024-H1",
+                "--data", str(csv_path),
+                "--format", "markdown",
+                "--output", out_path,
+                "--yoy",
+                "--quiet",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        assert "Warning" in result.output
+
+    def test_quiet_suppresses_yoy_info_line(self, multi_period_csv, tmp_path):
+        """The 'Year-over-year comparison: ...' line is suppressed in quiet mode."""
+        runner = CliRunner()
+        out_path = str(tmp_path / "report.md")
+        result = runner.invoke(
+            cli,
+            [
+                "generate",
+                "--framework", "dsa",
+                "--period", "2024-H1",
+                "--data", multi_period_csv,
+                "--format", "markdown",
+                "--output", out_path,
+                "--yoy",
+                "--quiet",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        assert "Year-over-year" not in result.output
+        assert "Report written" not in result.output
+        # The report itself should still be generated correctly
+        content = open(out_path).read()
+        assert "Period Comparison" in content
+
+    def test_without_quiet_shows_progress(self, simple_csv, tmp_path):
+        """Baseline: without --quiet the progress messages are present."""
+        runner = CliRunner()
+        out_path = str(tmp_path / "report.md")
+        result = runner.invoke(
+            cli,
+            [
+                "generate",
+                "--framework", "dsa",
+                "--period", "2024-H1",
+                "--data", simple_csv,
+                "--format", "markdown",
+                "--output", out_path,
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        assert "Generating" in result.output
+        assert "Report written" in result.output
