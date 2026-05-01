@@ -5,12 +5,18 @@ import pytest
 
 from transparency_engine.config import PeriodSpec
 from transparency_engine.frameworks.dsa import DSAFramework
+from transparency_engine.frameworks.lgpd import LGPDFramework
 from transparency_engine.frameworks.osa import OSAFramework
 
 
 @pytest.fixture
 def dsa_framework():
     return DSAFramework()
+
+
+@pytest.fixture
+def lgpd_framework():
+    return LGPDFramework()
 
 
 @pytest.fixture
