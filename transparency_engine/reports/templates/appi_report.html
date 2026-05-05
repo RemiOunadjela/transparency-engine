@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ framework_name }} Transparency Report — {{ platform_name }} — {{ period }}</title>
+    <style>
+        :root {
+            --primary: #1a1a2e;
+            --accent: #c8102e;
+            --bg: #ffffff;
+            --text: #1a1a1a;
+            --muted: #5c5c5c;
+            --border: #cccccc;
+            --highlight: #f5f5f5;
+            --link: #0057a8;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: "Noto Sans", "Inter", "Segoe UI", system-ui, sans-serif;
+            line-height: 1.6;
+            color: var(--text);
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 40px 24px;
+        }
+        header {
+            border-bottom: 4px solid var(--accent);
+            padding-bottom: 24px;
+            margin-bottom: 40px;
+        }
+        header h1 { font-size: 28px; color: var(--primary); margin-bottom: 8px; font-weight: 700; }
+        header .meta { color: var(--muted); font-size: 14px; }
+        header .meta span { margin-right: 20px; }
+        .ppc-note {
+            background: var(--highlight);
+            border-left: 4px solid var(--accent);
+            padding: 16px 20px;
+            margin-bottom: 32px;
+            font-size: 14px;
+            color: var(--muted);
+        }
+        .section { margin-bottom: 48px; }
+        .section h2 {
+            font-size: 20px;
+            color: var(--primary);
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 8px;
+            margin-bottom: 16px;
+        }
+        .section p.description { color: var(--muted); margin-bottom: 16px; font-size: 14px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+        th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--highlight); font-weight: 600; font-size: 13px; }
+        td { font-size: 14px; }
+        td.value { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
+        .footer { margin-top: 60px; padding-top: 20px; border-top: 2px solid var(--border); color: var(--muted); font-size: 12px; }
+        @media print {
+            body { max-width: none; padding: 20px; }
+            .section { page-break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>{{ framework_name }} Transparency Report</h1>
+        <div class="meta">
+            <span><strong>Business Operator:</strong> {{ platform_name }}</span>
+            <span><strong>Reporting Period:</strong> {{ period }}</span>
+            <span><strong>Published:</strong> {{ generated_at }}</span>
+        </div>
+    </header>
+
+    <div class="ppc-note">
+        This report is prepared in accordance with the transparency and accountability
+        obligations of Japan's Act on the Protection of Personal Information (APPI,
+        Act No. 57 of 2003, as revised in April 2022), under the oversight of the
+        Personal Information Protection Commission (PPC).
+    </div>
+
+    {% for section in sections %}
+    <div class="section">
+        <h2>{{ section.title }}</h2>
+        <p class="description">{{ section.description }}</p>
+        {% if section.metrics %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Metric</th>
+                    <th style="text-align: right;">Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for metric in section.metrics %}
+                <tr>
+                    <td>{{ metric.name }}</td>
+                    <td class="value">{{ metric.formatted_value }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p style="color: var(--muted); font-style: italic;">No data reported for this section.</p>
+        {% endif %}
+    </div>
+    {% endfor %}
+
+    {% if comparison %}
+    <div class="section">
+        <h2>Year-on-Year Comparison</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Metric</th>
+                    <th style="text-align: right;">Current</th>
+                    <th style="text-align: right;">Previous</th>
+                    <th style="text-align: right;">Change</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in comparison %}
+                <tr>
+                    <td>{{ row.metric_id }}</td>
+                    <td class="value">{{ "{:,.0f}".format(row.current_value) }}</td>
+                    <td class="value">{{ "{:,.0f}".format(row.previous_value) }}</td>
+                    <td class="value">{{ "{:+,.0f}".format(row.absolute_change) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    <div class="footer">
+        <p>Generated by transparency-engine v{{ engine_version }} on {{ generated_at }}. Subject to the operator's internal data quality processes.</p>
+    </div>
+</body>
+</html>

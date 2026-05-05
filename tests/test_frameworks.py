@@ -6,10 +6,65 @@ import pytest
 
 from transparency_engine.config import ReportingPeriod
 from transparency_engine.frameworks import REGISTRY, get_framework
+from transparency_engine.frameworks.appi import APPIFramework
 from transparency_engine.frameworks.custom import CustomFramework
 from transparency_engine.frameworks.dsa import DSAFramework
 from transparency_engine.frameworks.lgpd import LGPDFramework
 from transparency_engine.frameworks.osa import OSAFramework
+
+
+class TestAPPIFramework:
+    def test_basic_properties(self, appi_framework):
+        assert appi_framework.name == "Japan Act on the Protection of Personal Information"
+        assert appi_framework.short_code == "appi"
+        assert appi_framework.reporting_cadence == ReportingPeriod.ANNUAL
+
+    def test_has_individual_rights_metrics(self, appi_framework):
+        ids = {m.metric_id for m in appi_framework.metric_requirements()}
+        assert "disclosure_requests_received" in ids
+        assert "disclosure_requests_fulfilled" in ids
+        assert "disclosure_requests_denied" in ids
+        assert "rights_requests_median_response_days" in ids
+
+    def test_has_incident_metrics(self, appi_framework):
+        ids = {m.metric_id for m in appi_framework.metric_requirements()}
+        assert "incidents_reported_to_ppc" in ids
+        assert "incidents_affecting_principals" in ids
+        assert "incident_median_detection_to_notification_days" in ids
+
+    def test_has_transfer_metrics(self, appi_framework):
+        ids = {m.metric_id for m in appi_framework.metric_requirements()}
+        assert "cross_border_transfers_count" in ids
+        assert "third_party_disclosures_domestic" in ids
+
+    def test_has_governance_metrics(self, appi_framework):
+        ids = {m.metric_id for m in appi_framework.metric_requirements()}
+        assert "privacy_manager_appointed" in ids
+
+    def test_report_sections_ordered(self, appi_framework):
+        sections = appi_framework.report_sections()
+        orders = [s.order for s in sections]
+        assert orders == sorted(orders)
+
+    def test_section_metrics_reference_valid_ids(self, appi_framework):
+        valid_ids = {m.metric_id for m in appi_framework.metric_requirements()}
+        for section in appi_framework.report_sections():
+            for mid in section.metrics:
+                assert mid in valid_ids, (
+                    f"Section '{section.section_id}' references unknown metric '{mid}'"
+                )
+
+    def test_validate_completeness_required_only(self, appi_framework):
+        required_ids = appi_framework.required_metric_ids()
+        assert appi_framework.validate_completeness(required_ids) == []
+
+    def test_validate_completeness_missing(self, appi_framework):
+        missing = appi_framework.validate_completeness(set())
+        assert "disclosure_requests_received" in missing
+        assert "incidents_reported_to_ppc" in missing
+
+    def test_template_name(self, appi_framework):
+        assert appi_framework.get_template_name() == "appi_report.html"
 
 
 class TestDSAFramework:
@@ -161,6 +216,10 @@ class TestCustomFramework:
 
 
 class TestRegistry:
+    def test_get_framework_appi(self):
+        fw = get_framework("appi")
+        assert isinstance(fw, APPIFramework)
+
     def test_get_framework_dsa(self):
         fw = get_framework("dsa")
         assert isinstance(fw, DSAFramework)
@@ -178,6 +237,7 @@ class TestRegistry:
             get_framework("nonexistent")
 
     def test_registry_keys(self):
+        assert "appi" in REGISTRY
         assert "dsa" in REGISTRY
         assert "lgpd" in REGISTRY
         assert "osa" in REGISTRY
