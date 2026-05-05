@@ -263,7 +263,9 @@ def generate(
             )
 
     if output_path is None:
-        ext = {"markdown": "md", "html": "html", "pdf": "pdf", "json": "json", "csv": "csv"}[fmt.value]
+        ext = {"markdown": "md", "html": "html", "pdf": "pdf", "json": "json", "csv": "csv"}[
+            fmt.value
+        ]
         output_path = f"reports/{fw.short_code}_report_{period_spec}.{ext}"
 
     generator = ReportGenerator(
