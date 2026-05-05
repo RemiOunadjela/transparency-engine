@@ -49,9 +49,7 @@ class APPIFramework(BaseFramework):
             MetricRequirement(
                 metric_id="disclosure_requests_denied",
                 name="Disclosure requests denied",
-                description=(
-                    "Requests denied and the permissible grounds cited under Art. 33, §2"
-                ),
+                description=("Requests denied and the permissible grounds cited under Art. 33, §2"),
                 breakdown_by=["denial_reason"],
             ),
             MetricRequirement(
