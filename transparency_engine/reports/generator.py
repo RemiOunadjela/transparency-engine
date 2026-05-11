@@ -6,6 +6,8 @@ coordinating templates, visualisations, and format-specific rendering.
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 from pathlib import Path
 from typing import Any
@@ -121,6 +123,8 @@ class ReportGenerator:
             content = json.dumps(context, indent=2, default=str)
         elif output_format == OutputFormat.MARKDOWN:
             content = self._render_markdown(context)
+        elif output_format == OutputFormat.CSV:
+            content = self._render_csv(context)
         elif output_format in (OutputFormat.HTML, OutputFormat.PDF):
             content = self._render_html(context)
         else:
@@ -137,6 +141,52 @@ class ReportGenerator:
             Path(output_path).write_text(content, encoding="utf-8")
 
         return content
+
+    def _render_csv(self, context: dict[str, Any]) -> str:
+        """Render report metrics as a flat CSV.
+
+        Writes a metrics table (one row per metric) followed by a comparison table
+        when period-comparison data is present. Both tables share the file so a
+        single export is useful for BI tools and spreadsheets alike.
+        """
+        buf = io.StringIO()
+        writer = csv.writer(buf, lineterminator="\n")
+
+        # Metrics table
+        writer.writerow(["table", "period", "section", "metric_id", "metric_name", "value", "formatted_value"])
+        period = context["period"]
+        for section in context["sections"]:
+            for metric in section["metrics"]:
+                writer.writerow(
+                    [
+                        "metrics",
+                        period,
+                        section["title"],
+                        metric["metric_id"],
+                        metric["name"],
+                        metric["value"],
+                        metric["formatted_value"],
+                    ]
+                )
+
+        # Comparison table (appended when --yoy or --compare-period was used)
+        if context.get("comparison"):
+            writer.writerow([])
+            writer.writerow(["table", "metric_id", "current_value", "previous_value", "absolute_change", "percent_change"])
+            for row in context["comparison"]:
+                pct = row.get("percent_change")
+                writer.writerow(
+                    [
+                        "comparison",
+                        row["metric_id"],
+                        row["current_value"],
+                        row["previous_value"],
+                        row["absolute_change"],
+                        f"{pct:.2f}" if pct is not None else "",
+                    ]
+                )
+
+        return buf.getvalue()
 
     def _render_html(self, context: dict[str, Any]) -> str:
         template_name = self.framework.get_template_name()

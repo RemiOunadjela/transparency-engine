@@ -117,6 +117,69 @@ class TestReportGenerator:
         with pytest.raises(ValueError, match="output_path is required"):
             generator.generate(OutputFormat.PDF)
 
+    def test_generate_csv_basic(self, generator):
+        import csv as csv_mod
+        import io
+
+        content = generator.generate(OutputFormat.CSV)
+        reader = csv_mod.DictReader(io.StringIO(content))
+        rows = list(reader)
+        assert len(rows) > 0
+        assert rows[0]["table"] == "metrics"
+        assert rows[0]["period"] == "2024-H1"
+        metric_ids = {r["metric_id"] for r in rows}
+        assert "notices_received" in metric_ids
+
+    def test_generate_csv_includes_formatted_value(self, generator):
+        import csv as csv_mod
+        import io
+
+        content = generator.generate(OutputFormat.CSV)
+        reader = csv_mod.DictReader(io.StringIO(content))
+        rows = [r for r in reader if r["metric_id"] == "notices_received"]
+        assert len(rows) == 1
+        assert rows[0]["formatted_value"] == "284.8K"
+
+    def test_generate_csv_with_comparison(self, dsa_framework, report_data):
+        import csv as csv_mod
+        import io
+
+        prev_data = pd.DataFrame(
+            [
+                {"metric_id": "notices_received", "period": "2023-H2", "value": 251400},
+                {"metric_id": "notices_actioned", "period": "2023-H2", "value": 188550},
+            ]
+        )
+        period = PeriodSpec.parse("2024-H1")
+        gen = ReportGenerator(
+            framework=dsa_framework,
+            period=period,
+            data=report_data,
+            platform_name="TestPlatform",
+            previous_period_data=prev_data,
+        )
+        content = gen.generate(OutputFormat.CSV)
+        lines = content.strip().splitlines()
+        # There should be a blank separator line between the two tables
+        assert "" in lines
+        # Parse all non-blank, non-header rows
+        all_rows: list[dict] = []
+        for chunk in content.split("\r\n\r\n") + content.split("\n\n"):
+            chunk = chunk.strip()
+            if not chunk:
+                continue
+            reader = csv_mod.DictReader(io.StringIO(chunk))
+            all_rows.extend(list(reader))
+        tables = {r["table"] for r in all_rows}
+        assert "metrics" in tables
+        assert "comparison" in tables
+        comparison_rows = [r for r in all_rows if r["table"] == "comparison"]
+        assert any(r["metric_id"] == "notices_received" for r in comparison_rows)
+
+    def test_generate_csv_no_comparison_section_when_no_prev_data(self, generator):
+        content = generator.generate(OutputFormat.CSV)
+        assert "comparison" not in content
+
 
 class TestPeriodSpecYoY:
     def test_yoy_period_half_year(self):
